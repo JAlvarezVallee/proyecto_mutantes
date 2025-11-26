@@ -1,43 +1,82 @@
 package com.mercadolibre.mutants.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mercadolibre.mutants.dto.DnaRequest;
-import com.mercadolibre.mutants.dto.StatsResponse;
-import com.mercadolibre.mutants.service.MutantService;
-import com.mercadolibre.mutants.service.StatsService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
-@RestController
-@RequestMapping
-public class MutantController {
+import java.util.List;
 
-    private final MutantService mutantService;
-    private final StatsService statsService;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-    public MutantController(MutantService mutantService, StatsService statsService) {
-        this.mutantService = mutantService;
-        this.statsService = statsService;
+@SpringBootTest
+@AutoConfigureMockMvc
+class MutantControllerIntegrationTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper mapper;
+
+    @Test
+    void mutantEndpointReturns200ForMutant() throws Exception {
+        DnaRequest request = new DnaRequest(List.of(
+                "ATGCGA",
+                "CAGTGC",
+                "TTATGT",
+                "AGAAGG",
+                "CCCCTA",
+                "TCACTG"
+        ));
+
+        mockMvc.perform(post("/mutant")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
     }
 
-    @Operation(summary = "Detecta si un ADN corresponde a un mutante")
-    @ApiResponse(responseCode = "200", description = "Es mutante")
-    @ApiResponse(responseCode = "403", description = "No es mutante")
-    @PostMapping("/mutant")
-    public ResponseEntity<Void> isMutant(@Valid @RequestBody DnaRequest request) {
-        boolean mutant = mutantService.isMutant(request.getDna());
-        return mutant
-                ? ResponseEntity.ok().build()
-                : ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    @Test
+    void mutantEndpointReturns403ForHuman() throws Exception {
+        DnaRequest request = new DnaRequest(List.of(
+                "ATGCGA",
+                "CAGTGC",
+                "TTATTT",
+                "AGACGG",
+                "GCGTCA",
+                "TCACTG"
+        ));
+
+        mockMvc.perform(post("/mutant")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
     }
 
-    @Operation(summary = "Devuelve estadísticas de mutantes vs humanos")
-    @GetMapping("/stats")
-    public ResponseEntity<StatsResponse> stats() {
-        StatsResponse stats = statsService.getStats();
-        return ResponseEntity.ok(stats);
+    @Test
+    void mutantEndpointReturns400ForInvalidBody() throws Exception {
+        // dna vacío → viola @NotEmpty
+        DnaRequest request = new DnaRequest(List.of());
+
+        mockMvc.perform(post("/mutant")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void statsEndpointReturns200AndFields() throws Exception {
+        mockMvc.perform(get("/stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count_mutant_dna").exists())
+                .andExpect(jsonPath("$.count_human_dna").exists())
+                .andExpect(jsonPath("$.ratio").exists());
     }
 }
+

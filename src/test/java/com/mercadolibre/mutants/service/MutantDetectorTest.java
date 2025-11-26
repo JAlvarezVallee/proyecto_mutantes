@@ -1,105 +1,124 @@
 package com.mercadolibre.mutants.service;
 
 import com.mercadolibre.mutants.exception.InvalidDnaException;
-import org.springframework.stereotype.Component;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-@Component
-public class MutantDetector {
+import static org.junit.jupiter.api.Assertions.*;
 
-    private static final int SEQUENCE_LENGTH = 4;
+class MutantDetectorTest {
 
-    public boolean isMutant(List<String> dnaList) {
-        if (dnaList == null || dnaList.isEmpty()) {
-            throw new InvalidDnaException("dna no puede ser nulo ni vacío");
-        }
+    private final MutantDetector detector = new MutantDetector();
 
-        int n = dnaList.size();
-        if (n < SEQUENCE_LENGTH) {
-            // no se puede formar secuencia de 4
-            return false;
-        }
+    @Test
+    void detectsMutantWithHorizontalAndDiagonalSequences() {
+        List<String> dna = List.of(
+                "ATGCGA",
+                "CAGTGC",
+                "TTATGT",
+                "AGAAGG",
+                "CCCCTA",
+                "TCACTG"
+        );
 
-        char[][] matrix = buildMatrix(dnaList, n);
-
-        int sequencesFound = 0;
-
-        for (int row = 0; row < n; row++) {
-            for (int col = 0; col < n; col++) {
-
-                char base = matrix[row][col];
-
-                if (base == 0) continue;
-
-                // Horizontal →
-                if (col <= n - SEQUENCE_LENGTH && hasSequence(matrix, row, col, 0, 1, base)) {
-                    sequencesFound++;
-                }
-
-                // Vertical ↓
-                if (row <= n - SEQUENCE_LENGTH && hasSequence(matrix, row, col, 1, 0, base)) {
-                    sequencesFound++;
-                }
-
-                // Diagonal principal ↘
-                if (row <= n - SEQUENCE_LENGTH && col <= n - SEQUENCE_LENGTH &&
-                        hasSequence(matrix, row, col, 1, 1, base)) {
-                    sequencesFound++;
-                }
-
-                // Diagonal secundaria ↙
-                if (row <= n - SEQUENCE_LENGTH && col >= SEQUENCE_LENGTH - 1 &&
-                        hasSequence(matrix, row, col, 1, -1, base)) {
-                    sequencesFound++;
-                }
-
-                if (sequencesFound > 1) {
-                    // early termination
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        assertTrue(detector.isMutant(dna));
     }
 
-    private char[][] buildMatrix(List<String> dnaList, int n) {
-        char[][] matrix = new char[n][n];
+    @Test
+    void detectsMutantWithVerticalSequence() {
+        List<String> dna = List.of(
+                "ATGCGA",
+                "ATGTGC",
+                "ATATGT",
+                "AGAAGG",
+                "CCCCTA",
+                "TCACTG"
+        );
+        // Columna 0: A A A A → una secuencia
+        // Agregamos otra secuencia diagonal:
+        dna = List.of(
+                "ATGCGA",
+                "CAGTGA",
+                "TTATGA",
+                "AGATGA",
+                "CCCCTA",
+                "TCACTG"
+        );
 
-        for (int i = 0; i < n; i++) {
-            String row = dnaList.get(i);
-
-            if (row == null || row.length() != n) {
-                throw new InvalidDnaException("La matriz debe ser NxN");
-            }
-
-            for (int j = 0; j < n; j++) {
-                char c = row.charAt(j);
-                if (!isValidBase(c)) {
-                    throw new InvalidDnaException(
-                            "Caracter inválido en ADN: " + c + " (solo A,T,C,G)");
-                }
-                matrix[i][j] = c;
-            }
-        }
-        return matrix;
+        assertTrue(detector.isMutant(dna));
     }
 
-    private boolean isValidBase(char c) {
-        return c == 'A' || c == 'T' || c == 'C' || c == 'G';
+    @Test
+    void returnsFalseWhenOnlyOneSequenceExists() {
+        List<String> dna = List.of(
+                "ATGCGA",
+                "CAGTGC",
+                "TTATTT",
+                "AGACGG",
+                "GCGTCA",
+                "TCACTG"
+        );
+        // Solo una secuencia horizontal
+
+        assertFalse(detector.isMutant(dna));
     }
 
-    private boolean hasSequence(char[][] m, int row, int col,
-                                int dRow, int dCol, char base) {
+    @Test
+    void returnsFalseWhenNoSequencesExist() {
+        List<String> dna = List.of(
+                "ATGCGA",
+                "CAGTGC",
+                "TTATGT",
+                "AGACGG",
+                "GCGTCA",
+                "TCACTG"
+        );
 
-        for (int i = 1; i < SEQUENCE_LENGTH; i++) {
-            int r = row + dRow * i;
-            int c = col + dCol * i;
-            if (m[r][c] != base) {
-                return false;
-            }
-        }
-        return true;
+        assertFalse(detector.isMutant(dna));
+    }
+
+    @Test
+    void throwsExceptionWhenMatrixIsNotSquare() {
+        List<String> dna = List.of(
+                "ATGC",
+                "CAGT",
+                "TTAT"   // 3 filas de 4 → no es NxN
+        );
+
+        assertThrows(InvalidDnaException.class, () -> detector.isMutant(dna));
+    }
+
+    @Test
+    void throwsExceptionWhenContainsInvalidCharacter() {
+        List<String> dna = List.of(
+                "ATGCGA",
+                "CAGTXC", // X inválida
+                "TTATGT",
+                "AGAAGG",
+                "CCCCTA",
+                "TCACTG"
+        );
+
+        assertThrows(InvalidDnaException.class, () -> detector.isMutant(dna));
+    }
+
+    @Test
+    void returnsFalseWhenMatrixIsSmallerThan4x4() {
+        List<String> dna = List.of(
+                "ATG",
+                "CAG",
+                "TTA"
+        );
+        // No se puede formar secuencia de 4
+
+        assertFalse(detector.isMutant(dna));
+    }
+
+    @Test
+    void throwsExceptionWhenDnaIsNullOrEmpty() {
+        assertThrows(InvalidDnaException.class, () -> detector.isMutant(null));
+        assertThrows(InvalidDnaException.class, () -> detector.isMutant(List.of()));
     }
 }
+

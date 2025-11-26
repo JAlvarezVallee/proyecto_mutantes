@@ -2,20 +2,45 @@ package com.mercadolibre.mutants.service;
 
 import com.mercadolibre.mutants.dto.StatsResponse;
 import com.mercadolibre.mutants.repository.DnaRecordRepository;
-import org.springframework.stereotype.Service;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-@Service
-public class StatsService {
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-    private final DnaRecordRepository dnaRecordRepository;
+@ExtendWith(MockitoExtension.class)
+class StatsServiceTest {
 
-    public StatsService(DnaRecordRepository dnaRecordRepository) {
-        this.dnaRecordRepository = dnaRecordRepository;
+    @Mock
+    private DnaRecordRepository dnaRecordRepository;
+
+    @InjectMocks
+    private StatsService statsService;
+
+    @Test
+    void calculatesStatsWithMutantsAndHumans() {
+        when(dnaRecordRepository.countByMutant(true)).thenReturn(40L);
+        when(dnaRecordRepository.countByMutant(false)).thenReturn(100L);
+
+        StatsResponse stats = statsService.getStats();
+
+        assertEquals(40L, stats.getCount_mutant_dna());
+        assertEquals(100L, stats.getCount_human_dna());
+        assertEquals(0.4, stats.getRatio(), 0.0001);
     }
 
-    public StatsResponse getStats() {
-        long mutants = dnaRecordRepository.countByMutant(true);
-        long humans  = dnaRecordRepository.countByMutant(false);
-        return new StatsResponse(mutants, humans);
+    @Test
+    void ratioIsZeroWhenNoHumans() {
+        when(dnaRecordRepository.countByMutant(true)).thenReturn(10L);
+        when(dnaRecordRepository.countByMutant(false)).thenReturn(0L);
+
+        StatsResponse stats = statsService.getStats();
+
+        assertEquals(10L, stats.getCount_mutant_dna());
+        assertEquals(0L, stats.getCount_human_dna());
+        assertEquals(0.0, stats.getRatio(), 0.0001);
     }
 }
