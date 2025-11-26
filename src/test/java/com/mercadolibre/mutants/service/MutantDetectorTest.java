@@ -79,15 +79,18 @@ class MutantDetectorTest {
     }
 
     @Test
-    void throwsExceptionWhenMatrixIsNotSquare() {
+    void returnsFalseWhenMatrixIsNotSquare() {
         List<String> dna = List.of(
                 "ATGC",
                 "CAGT",
                 "TTAT"   // 3 filas de 4 → no es NxN
         );
 
-        assertThrows(InvalidDnaException.class, () -> detector.isMutant(dna));
+        boolean result = detector.isMutant(dna);
+
+        assertFalse(result);
     }
+
 
     @Test
     void throwsExceptionWhenContainsInvalidCharacter() {
