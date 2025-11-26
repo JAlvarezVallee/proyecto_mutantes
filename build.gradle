@@ -46,3 +46,8 @@ jacocoTestCoverageVerification {
         }
     }
 }
+
+tasks.named('bootJar') {
+    mainClass = 'com.mercadolibre.mutants.MutantDetectorApplication'
+}
+
